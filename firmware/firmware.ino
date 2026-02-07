@@ -27,12 +27,19 @@
 void setup() {
   Serial.begin(115200);
   
-  pinMode(EN_PIN_MTR_1, OUTPUT);
-  pinMode(STEP_PIN_MTR_1, OUTPUT);
-  pinMode(DIR_PIN_MTR_1, OUTPUT);
+  pinMode(X_STEP_PIN, OUTPUT);
+  pinMode(X_DIR_PIN, OUTPUT);
+  pinMode(X_ENABLE_PIN, OUTPUT);
+  
+  pinMode(Y_STEP_PIN, OUTPUT);
+  pinMode(Y_DIR_PIN, OUTPUT);
+  pinMode(Y_ENABLE_PIN, OUTPUT);
 
-  digitalWrite(EN_PIN_MTR_1, LOW);  // Enable driver
-  digitalWrite(DIR_PIN_MTR_1, HIGH);
+  digitalWrite(X_ENABLE_PIN, LOW);  // Enable driver
+  digitalWrite(X_DIR_PIN, HIGH);
+  
+  digitalWrite(Y_ENABLE_PIN, LOW);  // Enable driver
+  digitalWrite(Y_DIR_PIN, HIGH);
 }
 
 void moveMotor(int step_pin, int dir_pin, int speed){
@@ -40,12 +47,12 @@ void moveMotor(int step_pin, int dir_pin, int speed){
   // digitalWrite(dir_pin, direction);
   //
   if(speed > 0){
-    digitalWrite(DIR_PIN_MTR_1, HIGH);
+    digitalWrite(dir_pin, HIGH);
   } else if(speed == 0) {
     return;
   }
   else {
-    digitalWrite(DIR_PIN_MTR_1, LOW);
+    digitalWrite(dir_pin, LOW);
     speed = -speed;
   }
 
@@ -79,10 +86,12 @@ void parseCommand(String input) {
   if (command == "MOVE") {
     // moveRobot(value1, value2);
     //
-    moveMotor(STEP_PIN_MTR_1, 0, value1);
+    moveMotor(X_STEP_PIN, X_DIR_PIN, value1);
+    moveMotor(Y_STEP_PIN, Y_DIR_PIN, value2);
     // Serial.println("OK MOVE " + String(value1) + " " + String(value2));
   } else if (command == "STOP") {
-    moveMotor(STEP_PIN_MTR_1, 0, 0);
+    moveMotor(X_STEP_PIN, X_DIR_PIN, 0);
+    moveMotor(Y_STEP_PIN, Y_DIR_PIN, 0);
   }
   else {
     Serial.println("ERROR Unknown command: " + command);

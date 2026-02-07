@@ -3,8 +3,13 @@ import time
 
 class Arm():
 
-    def __init__(self) -> None:
-        self.server = serial.Serial('/dev/ttyACM1', 115200, timeout=10)
+    def __init__(self, serial_interface) -> None:
+        # Controls - 
+        # action [base, shoulder]
+        # base - positive = right, negative = left
+        # shoulder - positive = forward, negative = back
+
+        self.server = serial.Serial(serial_interface, 115200, timeout=10)
         time.sleep(2)
 
     def step(self, action):
