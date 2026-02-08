@@ -37,7 +37,7 @@ class Arm():
         """
 
         MIN_DELAY = 200
-        MAX_DELAY = 800
+        MAX_DELAY = 1800
 
         signs = np.sign(action)
         magnitudes = np.abs(action)

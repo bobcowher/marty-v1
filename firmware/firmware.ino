@@ -26,7 +26,7 @@
 
 #define STATE_UPDATE_MS 100  // Send state updates every 2s (for debugging)
 #define MIN_STEP_PERIOD 200  // Minimum µs between steps (safety floor)
-#define COMMAND_TIMEOUT_MS 250  // Stop motors if no command received
+#define COMMAND_TIMEOUT_MS 150  // Stop motors if no command received
 
 // Motor state
 struct Motor {

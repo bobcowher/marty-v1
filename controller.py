@@ -24,85 +24,32 @@ class Controller:
         action[0] = self.joystick.get_axis(0)  # Left stick horizontal
         action[1] = self.joystick.get_axis(1)  # Left stick vertical
 
+
         # action[0] = action[0] * -1
         action[1] = action[1] * -1
 
-        # # Map right joystick to panda0_joint3 and panda0_joint4 angular velocity
-        # action[2] = self.joystick.get_axis(3)  # Right stick vertical
-        # action[2] = action[2]
-        #
-        # action[3] = self.joystick.get_axis(2)  # Right stick horizontal
-        # action[3] = action[3] * -1
-        #
-        # # # Map L2 and R2 triggers to panda0_joint5 and panda0_joint6 angular velocity
-        # # action[4] = joystick.get_axis(2)  # L2 trigger
-        # # action[5] = joystick.get_axis(5)  # R2 trigger
-        #
-        # # Map buttons or D-pad to gripper control
-        # if self.joystick.get_button(0):  # X button
-        #     action[4] = -1
-        #     print("Button 0 pressed")
-        # elif self.joystick.get_button(2):  # Circle button
-        #     action[4] = 1
-        #     print("Button 2 pressed")
-        # elif self.joystick.get_button(1):
-        #     self.gripper_closed = True
-        #     gripper_button_pressed = True
-        #     print("Button 1 pressed")
-        # elif self.joystick.get_button(3):
-        #     self.gripper_closed = False
-        #     gripper_button_pressed = True
-        #     print("Button 3 pressed")
-        # elif self.joystick.get_button(4):  # Circle button
-        #     action[5] = 1
-        #     print("Button 4 pressed")
-        # elif self.joystick.get_button(5):
-        #     action[5] = -1
-        #     print("Button 5 pressed")
-        # elif self.joystick.get_button(6):  # Circle button
-        #     action[6] = -1
-        #     print("Button 6 pressed")
-        # elif self.joystick.get_button(7):
-        #     action[6] = 1
-        #     print("Button 7 pressed")
-        # elif self.joystick.get_button(8):  # Circle button
-        #     action[7] = 1
-        #     print("Button 8 pressed")
-        # elif self.joystick.get_button(9):
-        #     action[7] = -1
-        #     print("Button 9 pressed")
-        # 
-        # Deadzone filter
-        mask = np.abs(action) >= 0.15
-        action = action * mask
+        dead_zone = 0.15
 
-        if np.all(action == 0) and gripper_button_pressed == False:
+        # Apply deadzone and remap to full range
+        signs = np.sign(action)
+        magnitudes = np.abs(action)
+
+        # Zero out values in deadzone, remap rest: deadzone->0, 1.0->1.0
+        in_deadzone = magnitudes < dead_zone
+        remapped = np.where(
+            in_deadzone,
+            0.0,
+            (magnitudes - dead_zone) / (1 - dead_zone)
+        )
+        action = signs * remapped
+
+        if np.all(action == 0) and not gripper_button_pressed:
             action = None
-        # else:
-        #     # Invert scaling: full stick = fast (low delay), small stick = slow (high delay)
-        #     # MIN_DELAY = 200 (fastest), MAX_DELAY = 800 (slowest)
-        #     MIN_DELAY = 200
-        #     MAX_DELAY = 800
-        #
-        #     signs = np.sign(action)
-        #     magnitudes = np.abs(action)
-        #
-        #     # Map magnitude 0.1->1.0 to delay MAX->MIN
-        #     # t=0 at mag=0.1, t=1 at mag=1.0
-        #     t = (magnitudes - 0.1) / 0.9
-        #     t = np.clip(t, 0, 1)
-        #     delays = MAX_DELAY - t * (MAX_DELAY - MIN_DELAY)
-        #
-        #     # Where magnitude is 0 (deadzone), set delay to 0 (no movement)
-        #     delays = np.where(magnitudes == 0, 0, delays)
-        #
-        #     action = signs * delays
-        # else:
-        #     if self.gripper_closed == True:
-        #         action[7] = -1.0  # Close gripper
-        #         action[8] = -1.0
-        #     elif self.gripper_closed == False:
-        #         action[7] = 1.0  # Open gripper
-        #         action[8] = 1.0
+        else:
+            # Because these are on the same axis, null out one or the other to prevent contamination.
+            if np.abs(action[0]) > np.abs(action[1]):
+                action[1] = 0
+            else:
+                action[0] = 0
 
         return action
