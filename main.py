@@ -16,9 +16,12 @@ controller = Controller()
 # action = np.array([500, 500])
 print("Controller connected. Use left stick to move robot. Ctrl+C to exit.")
 
-last_action_was_moving = False
+COMMAND_RATE_HZ = 50  # Send commands at 50Hz max
+command_interval = 1.0 / COMMAND_RATE_HZ
 
 while True:
+    loop_start = time.time()
+
     # Process pygame events (required for joystick to update)
     pygame.event.pump()
 
@@ -26,16 +29,11 @@ while True:
 
     if action is not None:
         robot.step(action)
-    #     robot.step(action)
-    #     last_action_was_moving = True
-    # else:
-    #     # Joystick released - stop motors
-    #     if last_action_was_moving:
-    #         robot.step([0, 0])
-    #         print("Stopped")
-    #         last_action_was_moving = False
-    #     time.sleep(0.01)  # Small sleep when idle
-    #
+
+    # Rate limit to prevent flooding serial
+    elapsed = time.time() - loop_start
+    if elapsed < command_interval:
+        time.sleep(command_interval - elapsed)
 
 
 

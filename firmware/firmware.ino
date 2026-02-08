@@ -24,8 +24,9 @@
 #define E1_DIR_PIN         34
 #define E1_ENABLE_PIN      30
 
-#define STATE_UPDATE_MS 100  // Send state updates every 100ms
+#define STATE_UPDATE_MS 100  // Send state updates every 2s (for debugging)
 #define MIN_STEP_PERIOD 200  // Minimum µs between steps (safety floor)
+#define COMMAND_TIMEOUT_MS 250  // Stop motors if no command received
 
 // Motor state
 struct Motor {
@@ -41,8 +42,9 @@ struct Motor {
 Motor motor_x;
 Motor motor_y;
 
-// State update timing
+// Timing
 unsigned long last_state_time = 0;
+unsigned long last_command_time = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -132,10 +134,10 @@ void parseCommand(String input) {
   int value2 = input.substring(secondSpace + 1).toInt();
 
   if (command == "MOVE") {
-    Serial.println("DEBUG v1=" + String(value1) + " v2=" + String(value2));
     setVelocity(motor_x, value1);
     setVelocity(motor_y, value2);
-    Serial.println("DEBUG x_period=" + String(motor_x.step_period) + " x_dir=" + String(motor_x.dir));
+    last_command_time = millis();
+    Serial.println("MOVE OK x_period=" + String(motor_x.step_period) + " cmd_time=" + String(last_command_time));
   } else if (command == "STOP") {
     setVelocity(motor_x, 0);
     setVelocity(motor_y, 0);
@@ -145,10 +147,21 @@ void parseCommand(String input) {
 }
 
 void loop() {
+  unsigned long now = millis();
+
   // Check for new commands (non-blocking)
   if (Serial.available() > 0) {
     String input = Serial.readStringUntil('\n');
+    Serial.println("GOT: [" + input + "]");
     parseCommand(input);
+  }
+
+  // Watchdog: stop motors if no command received recently
+  // Re-read time here since parseCommand updates last_command_time
+  unsigned long watchdog_now = millis();
+  if (last_command_time > 0 && (watchdog_now - last_command_time) > COMMAND_TIMEOUT_MS) {
+    motor_x.step_period = 0;
+    motor_y.step_period = 0;
   }
 
   // Update motors (non-blocking, runs continuously)
@@ -156,7 +169,6 @@ void loop() {
   updateMotor(motor_y);
 
   // Send state updates periodically
-  unsigned long now = millis();
   if (now - last_state_time >= STATE_UPDATE_MS) {
     Serial.println("STATE " + String(motor_x.position) + " " + String(motor_y.position));
     last_state_time = now;
