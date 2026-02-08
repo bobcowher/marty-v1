@@ -73,7 +73,7 @@ class Controller:
         #     print("Button 9 pressed")
         # 
         # Deadzone filter
-        mask = np.abs(action) >= 0.1
+        mask = np.abs(action) >= 0.15
         action = action * mask
 
         if np.all(action == 0) and gripper_button_pressed == False:
