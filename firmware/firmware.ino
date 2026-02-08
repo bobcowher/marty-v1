@@ -25,6 +25,7 @@
 #define E1_ENABLE_PIN      30
 
 #define STATE_UPDATE_MS 100  // Send state updates every 100ms
+#define MIN_STEP_PERIOD 200  // Minimum µs between steps (safety floor)
 
 // Motor state
 struct Motor {
@@ -78,17 +79,23 @@ void setup() {
 }
 
 void setVelocity(Motor &m, int speed) {
+  if (speed == 0) {
+    m.step_period = 0;  // stopped
+    return;
+  }
+
+  // Set direction
   if (speed > 0) {
     digitalWrite(m.dir_pin, HIGH);
-    m.step_period = speed;
     m.dir = 1;
-  } else if (speed < 0) {
-    digitalWrite(m.dir_pin, LOW);
-    m.step_period = -speed;
-    m.dir = -1;
   } else {
-    m.step_period = 0;  // stopped
+    digitalWrite(m.dir_pin, LOW);
+    m.dir = -1;
   }
+
+  // Set period with safety floor
+  int period = abs(speed);
+  m.step_period = (period < MIN_STEP_PERIOD) ? MIN_STEP_PERIOD : period;
 }
 
 void updateMotor(Motor &m) {
@@ -125,8 +132,10 @@ void parseCommand(String input) {
   int value2 = input.substring(secondSpace + 1).toInt();
 
   if (command == "MOVE") {
+    Serial.println("DEBUG v1=" + String(value1) + " v2=" + String(value2));
     setVelocity(motor_x, value1);
     setVelocity(motor_y, value2);
+    Serial.println("DEBUG x_period=" + String(motor_x.step_period) + " x_dir=" + String(motor_x.dir));
   } else if (command == "STOP") {
     setVelocity(motor_x, 0);
     setVelocity(motor_y, 0);
