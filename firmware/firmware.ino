@@ -24,25 +24,27 @@
 #define E1_DIR_PIN         34
 #define E1_ENABLE_PIN      30
 
-#define STEP_DURATION_MS 100  // Fixed timestep for Gym integration
+#define STATE_UPDATE_MS 100  // Send state updates every 100ms
 
-// Motor speeds (delay in µs between step pulses, 0 = stopped)
-int x_speed = 0;
-int y_speed = 0;
+// Motor state
+struct Motor {
+  int step_pin;
+  int dir_pin;
+  unsigned long step_period;  // µs between steps (0 = stopped)
+  unsigned long next_step_time;
+  bool step_pin_high;
+  long position;
+  int dir;  // 1 or -1
+};
 
-// Step tracking (proxy for position until encoders installed)
-long x_position = 0;
-long y_position = 0;
-int x_dir = 1;
-int y_dir = 1;
+Motor motor_x;
+Motor motor_y;
 
-// Gym step timing
-unsigned long step_start_time = 0;
-bool step_in_progress = false;
+// State update timing
+unsigned long last_state_time = 0;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("READY");
 
   pinMode(X_STEP_PIN, OUTPUT);
   pinMode(X_DIR_PIN, OUTPUT);
@@ -53,55 +55,57 @@ void setup() {
   pinMode(Y_ENABLE_PIN, OUTPUT);
 
   digitalWrite(X_ENABLE_PIN, LOW);  // Enable driver
-  digitalWrite(X_DIR_PIN, HIGH);
-
   digitalWrite(Y_ENABLE_PIN, LOW);  // Enable driver
-  digitalWrite(Y_DIR_PIN, HIGH);
+
+  // Initialize motor structs
+  motor_x.step_pin = X_STEP_PIN;
+  motor_x.dir_pin = X_DIR_PIN;
+  motor_x.step_period = 0;
+  motor_x.next_step_time = 0;
+  motor_x.step_pin_high = false;
+  motor_x.position = 0;
+  motor_x.dir = 1;
+
+  motor_y.step_pin = Y_STEP_PIN;
+  motor_y.dir_pin = Y_DIR_PIN;
+  motor_y.step_period = 0;
+  motor_y.next_step_time = 0;
+  motor_y.step_pin_high = false;
+  motor_y.position = 0;
+  motor_y.dir = 1;
+
+  Serial.println("READY");
 }
 
-void setXVelocity(int speed) {
+void setVelocity(Motor &m, int speed) {
   if (speed > 0) {
-    digitalWrite(X_DIR_PIN, HIGH);
-    x_speed = speed;
-    x_dir = 1;
+    digitalWrite(m.dir_pin, HIGH);
+    m.step_period = speed;
+    m.dir = 1;
   } else if (speed < 0) {
-    digitalWrite(X_DIR_PIN, LOW);
-    x_speed = -speed;
-    x_dir = -1;
+    digitalWrite(m.dir_pin, LOW);
+    m.step_period = -speed;
+    m.dir = -1;
   } else {
-    x_speed = 0;
+    m.step_period = 0;  // stopped
   }
 }
 
-void setYVelocity(int speed) {
-  if (speed > 0) {
-    digitalWrite(Y_DIR_PIN, HIGH);
-    y_speed = speed;
-    y_dir = 1;
-  } else if (speed < 0) {
-    digitalWrite(Y_DIR_PIN, LOW);
-    y_speed = -speed;
-    y_dir = -1;
-  } else {
-    y_speed = 0;
-  }
-}
+void updateMotor(Motor &m) {
+  if (m.step_period == 0) return;  // stopped
 
-void moveMotors() {
-  if (x_speed > 0) {
-    digitalWrite(X_STEP_PIN, HIGH);
-    delayMicroseconds(x_speed);
-    digitalWrite(X_STEP_PIN, LOW);
-    delayMicroseconds(x_speed);
-    x_position += x_dir;
-  }
+  unsigned long now = micros();
+  if (now >= m.next_step_time) {
+    // Toggle step pin
+    m.step_pin_high = !m.step_pin_high;
+    digitalWrite(m.step_pin, m.step_pin_high ? HIGH : LOW);
 
-  if (y_speed > 0) {
-    digitalWrite(Y_STEP_PIN, HIGH);
-    delayMicroseconds(y_speed);
-    digitalWrite(Y_STEP_PIN, LOW);
-    delayMicroseconds(y_speed);
-    y_position += y_dir;
+    // Count steps on falling edge
+    if (!m.step_pin_high) {
+      m.position += m.dir;
+    }
+
+    m.next_step_time = now + (m.step_period / 2);
   }
 }
 
@@ -121,34 +125,31 @@ void parseCommand(String input) {
   int value2 = input.substring(secondSpace + 1).toInt();
 
   if (command == "MOVE") {
-    setXVelocity(value1);
-    setYVelocity(value2);
+    setVelocity(motor_x, value1);
+    setVelocity(motor_y, value2);
   } else if (command == "STOP") {
-    setXVelocity(0);
-    setYVelocity(0);
+    setVelocity(motor_x, 0);
+    setVelocity(motor_y, 0);
   } else {
     Serial.println("ERROR Unknown command: " + command);
   }
 }
 
 void loop() {
-  // Accept new command only when not mid-step
-  if (Serial.available() > 0 && !step_in_progress) {
+  // Check for new commands (non-blocking)
+  if (Serial.available() > 0) {
     String input = Serial.readStringUntil('\n');
     parseCommand(input);
-    step_start_time = millis();
-    step_in_progress = true;
   }
 
-  // Keep stepping motors during the timestep
-  if (step_in_progress) {
-    moveMotors();
+  // Update motors (non-blocking, runs continuously)
+  updateMotor(motor_x);
+  updateMotor(motor_y);
 
-    // Timestep complete?
-    if (millis() - step_start_time >= STEP_DURATION_MS) {
-      // Report state (step counts as position proxy)
-      Serial.println("STATE " + String(x_position) + " " + String(y_position));
-      step_in_progress = false;
-    }
+  // Send state updates periodically
+  unsigned long now = millis();
+  if (now - last_state_time >= STATE_UPDATE_MS) {
+    Serial.println("STATE " + String(motor_x.position) + " " + String(motor_y.position));
+    last_state_time = now;
   }
 }
