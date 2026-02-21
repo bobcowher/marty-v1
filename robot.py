@@ -55,7 +55,7 @@ class Arm():
 
         print(f"Action: {action} - Action Scaled: {action_scaled}")
         # Build and send command
-        move_string = f"MOVE {int(action_scaled[0])} {int(action_scaled[1])}\n"
+        move_string = f"MOVE {int(action_scaled[0])} {int(action_scaled[1])} {int(action_scaled[2])}\n"
         self.server.write(move_string.encode())
         #
         # # Read any available state updates (non-blocking)

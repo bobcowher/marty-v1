@@ -16,13 +16,18 @@ class Controller:
         """
         Map PlayStation controller input to the robot's action space.
         """
-        action = np.zeros(2)  # Assuming 9 action dimensions as specified
+        action = np.zeros(3)  # Assuming 9 action dimensions as specified
 
-        gripper_button_pressed = False
+        # gripper_button_pressed = False
 
         # Map left joystick to panda0_joint1 and panda0_joint2 angular velocity
-        action[0] = self.joystick.get_axis(0)  # Left stick horizontal
-        action[1] = self.joystick.get_axis(1)  # Left stick vertical
+        action[0] = self.joystick.get_axis(0)  # Left stick horizontal - This is the base rotation
+        action[1] = self.joystick.get_axis(1)  # Left stick vertical - This is the shoulder movement
+        
+        action[2] = self.joystick.get_axis(3)  # Right stick vertical - This is the arm extension.
+
+        # action[3] = self.joystick.get_axis(2)  # Right stick horizontal - This is wrist rotation. 
+        #action[3] = action[3] * -1
 
 
         # action[0] = action[0] * -1
@@ -43,7 +48,7 @@ class Controller:
         )
         action = signs * remapped
 
-        if np.all(action == 0) and not gripper_button_pressed:
+        if np.all(action == 0):
             action = None
         else:
             # Because these are on the same axis, null out one or the other to prevent contamination.

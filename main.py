@@ -28,6 +28,7 @@ while True:
     action = controller.get_action()
 
     if action is not None:
+        print(action)
         robot.step(action)
 
     # Rate limit to prevent flooding serial

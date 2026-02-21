@@ -1,0 +1,23 @@
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 001 Device 002: ID 1038:2202 SteelSeries ApS Arctis Nova 7
+Bus 001 Device 003: ID 2dc8:3109 8BitDo Ultimate Wireless Controller
+Bus 001 Device 004: ID 046d:c52b Logitech, Inc. Unifying Receiver
+Bus 001 Device 005: ID 048d:5711 Integrated Technology Express, Inc. GIGABYTE Device 
+Bus 001 Device 006: ID 1b1c:0c3f Corsair iCUE LINK System Hub
+Bus 001 Device 007: ID 1b1c:0c0b Corsair Lighting Node Pro
+Bus 001 Device 008: ID 0bda:8922 Realtek Semiconductor Corp. Bluetooth Radio
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 003 Device 002: ID 19f7:004a RODE Microphones RØDE PodMic USB
+Bus 003 Device 003: ID 35ef:0012 DYGMA DEFY
+Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 007 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 007 Device 002: ID 0bda:5411 Realtek Semiconductor Corp. RTS5411 Hub
+Bus 007 Device 008: ID 2341:0042 Arduino SA Mega 2560 R3 (CDC ACM)
+Bus 008 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 008 Device 002: ID 0bda:0411 Realtek Semiconductor Corp. Hub
+Bus 009 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 009 Device 002: ID 05e3:0608 Genesys Logic, Inc. Hub
+Bus 010 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
