@@ -42,6 +42,7 @@ struct Motor {
 Motor motor_x;
 Motor motor_y;
 Motor motor_z;
+Motor motor_e0;
 
 // Timing
 unsigned long last_state_time = 0;
@@ -62,9 +63,14 @@ void setup() {
   pinMode(Z_DIR_PIN, OUTPUT);
   pinMode(Z_ENABLE_PIN, OUTPUT);
 
+  pinMode(E0_STEP_PIN, OUTPUT);
+  pinMode(E0_DIR_PIN, OUTPUT);
+  pinMode(E0_ENABLE_PIN, OUTPUT);
+
   digitalWrite(X_ENABLE_PIN, LOW);  // Enable driver
   digitalWrite(Y_ENABLE_PIN, LOW);  // Enable driver
   digitalWrite(Z_ENABLE_PIN, LOW);  // Enable driver
+  digitalWrite(E0_ENABLE_PIN, LOW);  // Enable driver
 
   // Initialize motor structs
   motor_x.step_pin = X_STEP_PIN;
@@ -90,6 +96,14 @@ void setup() {
   motor_z.step_pin_high = false;
   motor_z.position = 0;
   motor_z.dir = 1;
+    
+  motor_e0.step_pin = E0_STEP_PIN;
+  motor_e0.dir_pin = E0_DIR_PIN;
+  motor_e0.step_period = 0;
+  motor_e0.next_step_time = 0;
+  motor_e0.step_pin_high = false;
+  motor_e0.position = 0;
+  motor_e0.dir = 1;
 
   Serial.println("READY");
 }
@@ -138,8 +152,9 @@ void parseCommand(String input) {
   int firstSpace = input.indexOf(' ');
   int secondSpace = input.indexOf(' ', firstSpace + 1);
   int thirdSpace = input.indexOf(' ', secondSpace + 1);
+  int fourthSpace = input.indexOf(' ', thirdSpace + 1);
 
-  if (firstSpace == -1 || secondSpace == -1 || thirdSpace == -1) {
+  if (firstSpace == -1 || secondSpace == -1 || thirdSpace == -1 || fourthSpace == -1) {
     Serial.println("ERROR Invalid format");
     return;
   }
@@ -148,17 +163,20 @@ void parseCommand(String input) {
   int value1 = input.substring(firstSpace + 1, secondSpace).toInt();
   int value2 = input.substring(secondSpace + 1).toInt();
   int value3 = input.substring(thirdSpace + 1).toInt();
+  int value4 = input.substring(fourthSpace + 1).toInt();
 
   if (command == "MOVE") {
     setVelocity(motor_x, value1);
     setVelocity(motor_y, value2);
     setVelocity(motor_z, value3);
+    setVelocity(motor_e0, value4);
     last_command_time = millis();
     Serial.println("MOVE OK x_period=" + String(motor_x.step_period) + " cmd_time=" + String(last_command_time));
   } else if (command == "STOP") {
     setVelocity(motor_x, 0);
     setVelocity(motor_y, 0);
     setVelocity(motor_z, 0);
+    setVelocity(motor_e0, 0);
   } else {
     Serial.println("ERROR Unknown command: " + command);
   }
@@ -181,12 +199,14 @@ void loop() {
     motor_x.step_period = 0;
     motor_y.step_period = 0;
     motor_z.step_period = 0;
+    motor_e0.step_period = 0;
   }
 
   // Update motors (non-blocking, runs continuously)
   updateMotor(motor_x);
   updateMotor(motor_y);
   updateMotor(motor_z);
+  updateMotor(motor_e0);
 
   // Send state updates periodically
   if (now - last_state_time >= STATE_UPDATE_MS) {

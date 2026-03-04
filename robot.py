@@ -48,14 +48,23 @@ class Arm():
         t = np.clip(t, 0, 1)
         delays = MAX_DELAY - t * (MAX_DELAY - MIN_DELAY)
 
+        delays[3] = int(delays[3] * 0.5)
+
         # Where magnitude is 0 (deadzone), set delay to 0 (no movement)
         delays = np.where(magnitudes == 0, 0, delays)
 
         action_scaled = signs * delays
 
-        print(f"Action: {action} - Action Scaled: {action_scaled}")
+        # print(f"Action: {action} - Action Scaled: {action_scaled}")
         # Build and send command
-        move_string = f"MOVE {int(action_scaled[0])} {int(action_scaled[1])} {int(action_scaled[2])}\n"
+        move_string = "MOVE"
+        for action in action_scaled:
+            move_string = move_string + " " + str(int(action))
+
+        move_string += "\n"
+
+        print(move_string)
+
         self.server.write(move_string.encode())
         #
         # # Read any available state updates (non-blocking)
