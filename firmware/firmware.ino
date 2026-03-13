@@ -24,6 +24,8 @@
 #define E1_DIR_PIN         34
 #define E1_ENABLE_PIN      30
 
+#define GRIPPER_PIN        11
+
 #define STATE_UPDATE_MS 100  // Send state updates every 2s (for debugging)
 #define MIN_STEP_PERIOD 200  // Minimum µs between steps (safety floor)
 #define COMMAND_TIMEOUT_MS 150  // Stop motors if no command received
@@ -43,6 +45,7 @@ Motor motor_x;
 Motor motor_y;
 Motor motor_z;
 Motor motor_e0;
+Servo gripper;
 
 // Timing
 unsigned long last_state_time = 0;
@@ -72,6 +75,8 @@ void setup() {
   digitalWrite(Z_ENABLE_PIN, LOW);  // Enable driver
   digitalWrite(E0_ENABLE_PIN, LOW);  // Enable driver
 
+  gripper.attach(GRIPPER_PIN);
+  gripper.write(90);  // neutral/open position
   // Initialize motor structs
   motor_x.step_pin = X_STEP_PIN;
   motor_x.dir_pin = X_DIR_PIN;
