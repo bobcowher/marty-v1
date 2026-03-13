@@ -20,27 +20,30 @@ class Arm():
         # Clear any startup messages
         self.server.reset_input_buffer()
 
-        # Position tracking (from step counts)
-        self.position = [0, 0]
+        # Position tracking (from step counts + servo angle)
+        self.position = [0, 0, 0, 0, 90]
 
     def step(self, action):
         """
         Send velocity command. Motors continue at this velocity until next command.
 
         Args:
-            action: [x_speed, y_speed] where speed is delay in µs (sign = direction)
-                    Smaller absolute values = faster movement
-                    0 = stopped
+            action: [x_speed, y_speed, z_speed, e0_speed, servo_step]
+                    Motor speeds are delay in µs (sign = direction, smaller = faster, 0 = stopped)
+                    servo_step is discrete: -1, 0, or +1
 
         Returns:
-            observation: current position [x, y] as step counts
+            observation: current position [x, y, z, e0, gripper_angle]
         """
 
         MIN_DELAY = 200
         MAX_DELAY = 1800
 
-        signs = np.sign(action)
-        magnitudes = np.abs(action)
+        motor_action = action[:4]
+        servo_step = int(action[4])
+
+        signs = np.sign(motor_action)
+        magnitudes = np.abs(motor_action)
 
         # Map magnitude 0.1->1.0 to delay MAX->MIN
         # t=0 at mag=0.1, t=1 at mag=1.0
@@ -55,21 +58,18 @@ class Arm():
 
         action_scaled = signs * delays
 
-        # print(f"Action: {action} - Action Scaled: {action_scaled}")
         # Build and send command
         move_string = "MOVE"
-        for action in action_scaled:
-            move_string = move_string + " " + str(int(action))
-
+        for val in action_scaled:
+            move_string += " " + str(int(val))
+        move_string += " " + str(servo_step)
         move_string += "\n"
 
         print(move_string)
 
         self.server.write(move_string.encode())
-        #
-        # # Read any available state updates (non-blocking)
         self._read_state()
-        #
+
         return self.position
 
     def _read_state(self):
@@ -79,8 +79,8 @@ class Arm():
                 response = self.server.readline().decode().strip()
                 if response.startswith("STATE"):
                     parts = response.split()
-                    if len(parts) >= 3:
-                        self.position = [int(parts[1]), int(parts[2])]
+                    if len(parts) >= 6:
+                        self.position = [int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4]), int(parts[5])]
             except:
                 pass  # Ignore decode errors
 

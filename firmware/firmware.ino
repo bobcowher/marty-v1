@@ -1,3 +1,5 @@
+#include <Servo.h>
+
 // Motor 1 - Base
 
 #define EN_PIN_MTR_1    38
@@ -29,6 +31,9 @@
 #define STATE_UPDATE_MS 100  // Send state updates every 2s (for debugging)
 #define MIN_STEP_PERIOD 200  // Minimum µs between steps (safety floor)
 #define COMMAND_TIMEOUT_MS 150  // Stop motors if no command received
+#define SERVO_STEP_SIZE 2  // Degrees per servo step command
+#define SERVO_MIN 0
+#define SERVO_MAX 180
 
 // Motor state
 struct Motor {
@@ -46,6 +51,7 @@ Motor motor_y;
 Motor motor_z;
 Motor motor_e0;
 Servo gripper;
+int gripper_position = 90;
 
 // Timing
 unsigned long last_state_time = 0;
@@ -158,8 +164,9 @@ void parseCommand(String input) {
   int secondSpace = input.indexOf(' ', firstSpace + 1);
   int thirdSpace = input.indexOf(' ', secondSpace + 1);
   int fourthSpace = input.indexOf(' ', thirdSpace + 1);
+  int fifthSpace = input.indexOf(' ', fourthSpace + 1);
 
-  if (firstSpace == -1 || secondSpace == -1 || thirdSpace == -1 || fourthSpace == -1) {
+  if (firstSpace == -1 || secondSpace == -1 || thirdSpace == -1 || fourthSpace == -1 || fifthSpace == -1) {
     Serial.println("ERROR Invalid format");
     return;
   }
@@ -169,14 +176,20 @@ void parseCommand(String input) {
   int value2 = input.substring(secondSpace + 1).toInt();
   int value3 = input.substring(thirdSpace + 1).toInt();
   int value4 = input.substring(fourthSpace + 1).toInt();
+  int value5 = input.substring(fifthSpace + 1).toInt();
 
   if (command == "MOVE") {
     setVelocity(motor_x, value1);
     setVelocity(motor_y, value2);
     setVelocity(motor_z, value3);
     setVelocity(motor_e0, value4);
+    if (value5 != 0) {
+      gripper_position = constrain(gripper_position + value5 * SERVO_STEP_SIZE, SERVO_MIN, SERVO_MAX);
+      gripper.write(gripper_position);
+      Serial.println("SERVO step=" + String(value5) + " pos=" + String(gripper_position));
+    }
     last_command_time = millis();
-    Serial.println("MOVE OK x_period=" + String(motor_x.step_period) + " cmd_time=" + String(last_command_time));
+    Serial.println("MOVE OK x_period=" + String(motor_x.step_period) + " v5=" + String(value5));
   } else if (command == "STOP") {
     setVelocity(motor_x, 0);
     setVelocity(motor_y, 0);
@@ -215,7 +228,7 @@ void loop() {
 
   // Send state updates periodically
   if (now - last_state_time >= STATE_UPDATE_MS) {
-    Serial.println("STATE " + String(motor_x.position) + " " + String(motor_y.position));
+    Serial.println("STATE " + String(motor_x.position) + " " + String(motor_y.position) + " " + String(motor_z.position) + " " + String(motor_e0.position) + " " + String(gripper_position));
     last_state_time = now;
   }
 }
