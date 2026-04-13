@@ -50,6 +50,7 @@ Motor motor_x;
 Motor motor_y;
 Motor motor_z;
 Motor motor_e0;
+Motor motor_e1;
 Servo gripper;
 int gripper_position = 90;
 
@@ -76,13 +77,18 @@ void setup() {
   pinMode(E0_DIR_PIN, OUTPUT);
   pinMode(E0_ENABLE_PIN, OUTPUT);
 
-  digitalWrite(X_ENABLE_PIN, LOW);  // Enable driver
-  digitalWrite(Y_ENABLE_PIN, LOW);  // Enable driver
-  digitalWrite(Z_ENABLE_PIN, LOW);  // Enable driver
-  digitalWrite(E0_ENABLE_PIN, LOW);  // Enable driver
+  pinMode(E1_STEP_PIN, OUTPUT);
+  pinMode(E1_DIR_PIN, OUTPUT);
+  pinMode(E1_ENABLE_PIN, OUTPUT);
 
-  gripper.attach(GRIPPER_PIN);
-  gripper.write(90);  // neutral/open position
+  digitalWrite(X_ENABLE_PIN, LOW);   // Enable driver
+  digitalWrite(Y_ENABLE_PIN, LOW);   // Enable driver
+  digitalWrite(Z_ENABLE_PIN, LOW);   // Enable driver
+  digitalWrite(E0_ENABLE_PIN, LOW);  // Enable driver
+  digitalWrite(E1_ENABLE_PIN, LOW);  // Enable driver
+
+  // gripper.attach(GRIPPER_PIN);  // Uncomment when servo is connected
+  // gripper.write(90);
   // Initialize motor structs
   motor_x.step_pin = X_STEP_PIN;
   motor_x.dir_pin = X_DIR_PIN;
@@ -115,6 +121,14 @@ void setup() {
   motor_e0.step_pin_high = false;
   motor_e0.position = 0;
   motor_e0.dir = 1;
+
+  motor_e1.step_pin = E1_STEP_PIN;
+  motor_e1.dir_pin = E1_DIR_PIN;
+  motor_e1.step_period = 0;
+  motor_e1.next_step_time = 0;
+  motor_e1.step_pin_high = false;
+  motor_e1.position = 0;
+  motor_e1.dir = 1;
 
   Serial.println("READY");
 }
@@ -160,41 +174,46 @@ void updateMotor(Motor &m) {
 void parseCommand(String input) {
   input.trim();
 
-  int firstSpace = input.indexOf(' ');
+  int firstSpace  = input.indexOf(' ');
   int secondSpace = input.indexOf(' ', firstSpace + 1);
-  int thirdSpace = input.indexOf(' ', secondSpace + 1);
+  int thirdSpace  = input.indexOf(' ', secondSpace + 1);
   int fourthSpace = input.indexOf(' ', thirdSpace + 1);
-  int fifthSpace = input.indexOf(' ', fourthSpace + 1);
+  int fifthSpace  = input.indexOf(' ', fourthSpace + 1);
+  int sixthSpace  = input.indexOf(' ', fifthSpace + 1);
 
-  if (firstSpace == -1 || secondSpace == -1 || thirdSpace == -1 || fourthSpace == -1 || fifthSpace == -1) {
+  if (firstSpace == -1 || secondSpace == -1 || thirdSpace == -1 ||
+      fourthSpace == -1 || fifthSpace == -1 || sixthSpace == -1) {
     Serial.println("ERROR Invalid format");
     return;
   }
 
   String command = input.substring(0, firstSpace);
-  int value1 = input.substring(firstSpace + 1, secondSpace).toInt();
-  int value2 = input.substring(secondSpace + 1).toInt();
-  int value3 = input.substring(thirdSpace + 1).toInt();
-  int value4 = input.substring(fourthSpace + 1).toInt();
-  int value5 = input.substring(fifthSpace + 1).toInt();
+  int value1 = input.substring(firstSpace + 1,  secondSpace).toInt();
+  int value2 = input.substring(secondSpace + 1, thirdSpace).toInt();
+  int value3 = input.substring(thirdSpace + 1,  fourthSpace).toInt();
+  int value4 = input.substring(fourthSpace + 1, fifthSpace).toInt();
+  int value5 = input.substring(fifthSpace + 1,  sixthSpace).toInt();
+  int value6 = input.substring(sixthSpace + 1).toInt();
 
   if (command == "MOVE") {
-    setVelocity(motor_x, value1);
-    setVelocity(motor_y, value2);
-    setVelocity(motor_z, value3);
+    setVelocity(motor_x,  value1);
+    setVelocity(motor_y,  value2);
+    setVelocity(motor_z,  value3);
     setVelocity(motor_e0, value4);
-    if (value5 != 0) {
-      gripper_position = constrain(gripper_position + value5 * SERVO_STEP_SIZE, SERVO_MIN, SERVO_MAX);
+    setVelocity(motor_e1, value5);
+    if (value6 != 0) {
+      gripper_position = constrain(gripper_position + value6 * SERVO_STEP_SIZE, SERVO_MIN, SERVO_MAX);
       gripper.write(gripper_position);
-      Serial.println("SERVO step=" + String(value5) + " pos=" + String(gripper_position));
+      Serial.println("SERVO step=" + String(value6) + " pos=" + String(gripper_position));
     }
     last_command_time = millis();
-    Serial.println("MOVE OK x_period=" + String(motor_x.step_period) + " v5=" + String(value5));
+    Serial.println("MOVE OK x=" + String(motor_x.step_period) + " y=" + String(motor_y.step_period) + " z=" + String(motor_z.step_period) + " e0=" + String(motor_e0.step_period) + " e1=" + String(motor_e1.step_period));
   } else if (command == "STOP") {
-    setVelocity(motor_x, 0);
-    setVelocity(motor_y, 0);
-    setVelocity(motor_z, 0);
+    setVelocity(motor_x,  0);
+    setVelocity(motor_y,  0);
+    setVelocity(motor_z,  0);
     setVelocity(motor_e0, 0);
+    setVelocity(motor_e1, 0);
   } else {
     Serial.println("ERROR Unknown command: " + command);
   }
@@ -218,6 +237,7 @@ void loop() {
     motor_y.step_period = 0;
     motor_z.step_period = 0;
     motor_e0.step_period = 0;
+    motor_e1.step_period = 0;
   }
 
   // Update motors (non-blocking, runs continuously)
@@ -225,10 +245,11 @@ void loop() {
   updateMotor(motor_y);
   updateMotor(motor_z);
   updateMotor(motor_e0);
+  updateMotor(motor_e1);
 
   // Send state updates periodically
   if (now - last_state_time >= STATE_UPDATE_MS) {
-    Serial.println("STATE " + String(motor_x.position) + " " + String(motor_y.position) + " " + String(motor_z.position) + " " + String(motor_e0.position) + " " + String(gripper_position));
+    Serial.println("STATE " + String(motor_x.position) + " " + String(motor_y.position) + " " + String(motor_z.position) + " " + String(motor_e0.position) + " " + String(motor_e1.position) + " " + String(gripper_position));
     last_state_time = now;
   }
 }

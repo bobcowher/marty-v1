@@ -21,26 +21,26 @@ class Arm():
         self.server.reset_input_buffer()
 
         # Position tracking (from step counts + servo angle)
-        self.position = [0, 0, 0, 0, 90]
+        self.position = [0, 0, 0, 0, 0, 90]
 
     def step(self, action):
         """
         Send velocity command. Motors continue at this velocity until next command.
 
         Args:
-            action: [x_speed, y_speed, z_speed, e0_speed, servo_step]
+            action: [x_speed, y_speed, z_speed, e0_speed, e1_speed, servo_step]
                     Motor speeds are delay in µs (sign = direction, smaller = faster, 0 = stopped)
                     servo_step is discrete: -1, 0, or +1
 
         Returns:
-            observation: current position [x, y, z, e0, gripper_angle]
+            observation: current position [x, y, z, e0, e1, gripper_angle]
         """
 
         MIN_DELAY = 200
         MAX_DELAY = 1800
 
-        motor_action = action[:4]
-        servo_step = int(action[4])
+        motor_action = action[:5]
+        servo_step = int(action[5])
 
         signs = np.sign(motor_action)
         magnitudes = np.abs(motor_action)
@@ -79,14 +79,14 @@ class Arm():
                 response = self.server.readline().decode().strip()
                 if response.startswith("STATE"):
                     parts = response.split()
-                    if len(parts) >= 6:
-                        self.position = [int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4]), int(parts[5])]
+                    if len(parts) >= 7:
+                        self.position = [int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4]), int(parts[5]), int(parts[6])]
             except:
                 pass  # Ignore decode errors
 
     def stop(self):
         """Stop all motors."""
-        self.server.write(b"STOP 0 0\n")
+        self.server.write(b"STOP 0 0 0 0 0 0\n")
         return self.position
 
     def get_position(self):
@@ -96,7 +96,7 @@ class Arm():
 
     def reset_position(self):
         """Reset position tracking to zero."""
-        self.position = [0, 0]
+        self.position = [0, 0, 0, 0, 0, 90]
 
     def get_arduino_port(self):
         """Returns first Arduino port or None"""
