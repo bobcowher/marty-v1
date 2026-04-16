@@ -1,5 +1,6 @@
 import serial
 from serial.tools import list_ports
+import subprocess
 import time
 import numpy as np
 
@@ -14,8 +15,15 @@ class Arm():
         if serial_interface is None:
             serial_interface = self.get_arduino_port()
 
+        if serial_interface is None:
+            raise RuntimeError("No Arduino port found")
+
+        # Clear HUPCL at OS level so DTR is not dropped on open or close.
+        # DTR going LOW is what pulses RESET on the Arduino — this prevents that.
+        subprocess.run(['stty', '-F', serial_interface, '-hupcl'], capture_output=True)
+
         self.server = serial.Serial(serial_interface, 115200, timeout=0.01)
-        time.sleep(2)  # Wait for Arduino bootloader
+        time.sleep(0.1)
 
         # Clear any startup messages
         self.server.reset_input_buffer()
