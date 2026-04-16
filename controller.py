@@ -47,8 +47,6 @@ class Controller:
         action[1] = self.joystick.get_axis(1)  # Left stick vertical   - shoulder
         action[2] = self.joystick.get_axis(3)  # Right stick vertical  - elbow
 
-        action[1] = action[1] * -1
-
         dead_zone = 0.15
 
         # Apply deadzone and remap to full range (analog axes only)

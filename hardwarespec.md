@@ -47,8 +47,7 @@ TMC2209 in StealthChop may limit torque on high-inductance motors.
 **Total Torque:** 65 × 5.18 = 337 N⋅cm (25% more than old motor)
 **Output Shaft:** 8mm diameter with D-flat (15mm D-cut length)
 
-**DRV8825 VREF:** 0.84V (start), can go up to 1.0V if needed
-**Calculation:** 2.1A × 0.4 = 0.84V
+**DRV8825 VREF:** 1.68V (start), can go up to 2.1V if needed
 **Expected Current:** 2.1A RMS
 
 **Pins:** STEP=60, DIR=61, ENABLE=56
