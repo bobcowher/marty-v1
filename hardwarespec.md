@@ -98,8 +98,7 @@ TMC2209 in StealthChop may limit torque on high-inductance motors.
 **Current:** 0.8A rated
 **Gearbox:** 19:1 planetary (high reduction)
 
-**VREF:** 0.56V (start at 70%), tune up to 0.8V rated max
-**Calculation:** 0.8A × 1.0 = 0.8V rated max; 0.8A × 0.70 = 0.56V for 70% start
+**VREF:** 0.64V (start at 80%), tune up to 0.8V rated max
 **Expected Peak Current:** ~0.56-0.8A
 
 **Pins:** STEP=26, DIR=28, ENABLE=24
@@ -113,10 +112,9 @@ TMC2209 in StealthChop may limit torque on high-inductance motors.
 
 ## Motor 5: Wrist Rotation (E1)
 **Model:** (Verify - listed as 17HS19-1684S-PG5 but described as Nema11 0.67A)
-**Current:** 0.67A rated (if Nema11) OR 1.68A (if actually 17HS19-1684S-PG5)
+**Current:** 0.67A rated (if Nema11)
 
-**VREF:** 0.47V (if 0.67A) OR 1.18V (if 1.68A) — confirm motor model first
-**Calculation:** 0.67A × 1.0 = 0.67V rated max; 0.67A × 0.70 = 0.47V for 70% start
+**VREF:** 0.53V 
 
 **Pins:** STEP=36, DIR=34, ENABLE=30
 **Wiring:** TBD - verify motor model and color code

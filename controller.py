@@ -45,13 +45,15 @@ class Controller:
 
         action[0] = self.joystick.get_axis(0)  # Left stick horizontal - base rotation
         action[1] = self.joystick.get_axis(1)  # Left stick vertical   - shoulder
+        action[4] = self.joystick.get_axis(2)  # Right stick horizontal 
         action[2] = self.joystick.get_axis(3)  # Right stick vertical  - elbow
 
         dead_zone = 0.15
 
         # Apply deadzone and remap to full range (analog axes only)
-        signs = np.sign(action[:3])
-        magnitudes = np.abs(action[:3])
+        dead_zone_indices = [0,1,2,4]
+        signs = np.sign(action[dead_zone_indices])
+        magnitudes = np.abs(action[dead_zone_indices])
 
         in_deadzone = magnitudes < dead_zone
         remapped = np.where(
@@ -59,7 +61,7 @@ class Controller:
             0.0,
             (magnitudes - dead_zone) / (1 - dead_zone)
         )
-        action[:3] = signs * remapped
+        action[dead_zone_indices] = signs * remapped
 
         # L1 (button 5) = up, R1 (button 6) = down — wrist tilt
         l1 = self.joystick.get_button(5)
@@ -67,9 +69,9 @@ class Controller:
         action[3] = l1 - r1  # +1 (up), -1 (down), 0 (neither)
 
         # L2 (button 7) / R2 (button 8) — wrist rotation
-        l2 = self.joystick.get_button(7)
-        r2 = self.joystick.get_button(8)
-        action[4] = r2 - l2  # -1, 0, or +1
+        # l2 = self.joystick.get_button(7)
+        # r2 = self.joystick.get_button(8)
+        # action[4] = r2 - l2  # -1, 0, or +1
 
         # action[5] = servo step — unassigned until servo is connected
 
@@ -81,5 +83,10 @@ class Controller:
                 action[1] = 0
             else:
                 action[0] = 0
+            
+            if np.abs(action[2]) > np.abs(action[4]):
+                action[4] = 0
+            else:
+                action[2] = 0
 
         return action
