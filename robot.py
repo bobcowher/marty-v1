@@ -59,7 +59,7 @@ class Arm():
         t = np.clip(t, 0, 1)
         delays = MAX_DELAY - t * (MAX_DELAY - MIN_DELAY)
 
-        delays[1] = int(delays[1] / 1.4)  # Shoulder 40% faster
+        delays[1] = int(delays[1] / 2.0)  # Shoulder 2x faster
         delays[3] = int(delays[3] * 0.5)
 
         # Where magnitude is 0 (deadzone), set delay to 0 (no movement)
