@@ -5,6 +5,7 @@ import time
 class Controller:
     def __init__(self, timeout=300, retry_interval=5):
         self.gripper_closed = None
+        self.armed = False
 
         pygame.init()
         pygame.joystick.init()
@@ -62,6 +63,14 @@ class Controller:
             (magnitudes - dead_zone) / (1 - dead_zone)
         )
         action[dead_zone_indices] = signs * remapped
+
+        # Axes read a stale -1.0 until the first controller event arrives.
+        # Ignore input until the sticks have reported centered once.
+        if not self.armed:
+            if np.all(action[dead_zone_indices] == 0):
+                self.armed = True
+                print("Sticks centered - controls live")
+            return None
 
         # L1 (button 5) = up, R1 (button 6) = down — wrist tilt
         l1 = self.joystick.get_button(5)

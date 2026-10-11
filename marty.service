@@ -1,0 +1,13 @@
+[Unit]
+Description=Marty arm joystick control (main.py)
+
+[Service]
+WorkingDirectory=/home/bot/marty-v1
+ExecStart=/home/bot/miniconda3/envs/marty-v1/bin/python /home/bot/marty-v1/main.py
+Environment=PYTHONUNBUFFERED=1
+Environment=SDL_VIDEODRIVER=dummy
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
