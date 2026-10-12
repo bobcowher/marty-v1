@@ -86,7 +86,8 @@ TMC2209 in StealthChop may limit torque on high-inductance motors.
 **Output Shaft:** 8mm diameter with D-flat (15mm D-cut length)
 
 **Driver:** DRV8825, moved over from the shoulder along with the motor, same VREF as it ran there.
-**VREF:** Measure and record. Old notes said 1.68V, but by the DRV8825 formula below that's ~3.4A, beyond the DRV8825's 2.5A max — the right setting for 2.1A is ~1.05V (0.1Ω board) or ~0.84V (0.08Ω board).
+**VREF:** Measured 1.7V (2026-10-11). Pololu DRV8825 (0.100Ω sense): Current Limit = VREF × 2, so 1.7V asks for 3.4A, but the board's sense resistors cap it at ~2.2A — the driver runs at its ceiling, which is why it ran hot. Datasheet-correct setting for this 2.1A motor: ~1.05V. Source: https://www.pololu.com/product/2133
+- Online calculators disagree (grandpacad gave 1.68V for 2.1A; that equals the A4988 formula 8 × I × 0.1Ω, so check which driver it had selected). Trust the board maker's formula for the exact driver.
 
 **Pins:** STEP=46, DIR=48, ENABLE=62
 **Wiring:** Black/Green = one coil, Red/Blue = other coil.
