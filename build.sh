@@ -6,7 +6,7 @@ export PATH="$HOME/.local/bin:$PATH"
 SKETCH=${1:-firmware}
 cd "$(dirname "$0")/$SKETCH"
 
-arduino-cli lib install "TMCStepper"
+arduino-cli lib install "TMCStepper" "Servo"
 arduino-cli compile --fqbn arduino:avr:mega:cpu=atmega2560 .
 
 # Dynamically detect the Arduino Mega 2560 port by USB vendor/product ID
