@@ -1,5 +1,10 @@
 
-cd firmware
+#!/bin/bash
+# Compile and upload a sketch to the Mega. Usage: ./build.sh [sketch_dir]  (default: firmware)
+set -e
+export PATH="$HOME/.local/bin:$PATH"
+SKETCH=${1:-firmware}
+cd "$(dirname "$0")/$SKETCH"
 
 arduino-cli lib install "TMCStepper"
 arduino-cli compile --fqbn arduino:avr:mega:cpu=atmega2560 .
