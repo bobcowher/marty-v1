@@ -30,7 +30,7 @@ int readReg(uint8_t reg, uint8_t len) {
   Wire.beginTransmission(AS5600_ADDR);
   Wire.write(reg);
   if (Wire.endTransmission(false) != 0) return -1;
-  if (Wire.requestFrom(AS5600_ADDR, len) != len) return -1;
+  if (Wire.requestFrom((uint8_t)AS5600_ADDR, len) != len) return -1;
   int v = 0;
   for (uint8_t i = 0; i < len; i++) v = (v << 8) | Wire.read();
   return v;
@@ -41,6 +41,11 @@ void setup() {
   Wire.begin();
   Wire.setClock(100000);
   Wire.setWireTimeout(3000, true);  // don't hang forever on a stuck bus
+
+  // The mux keeps its last channel across a Mega reset; deselect all first.
+  Wire.beginTransmission(MUX_ADDR);
+  Wire.write(0);
+  Wire.endTransmission();
 
   Serial.println("I2C scan (no mux channel selected):");
   for (uint8_t a = 1; a < 127; a++) {
