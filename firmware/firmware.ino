@@ -1,4 +1,5 @@
 #include <Servo.h>
+#include <Wire.h>
 
 // Motor 1 - Base
 
@@ -35,6 +36,13 @@
 #define SERVO_MIN 0
 #define SERVO_MAX 180
 
+// AS5600 encoders behind a PCA9548A mux; mux channel = joint index
+#define MUX_ADDR      0x70
+#define AS5600_ADDR   0x36
+#define REG_STATUS    0x0B  // STATUS then RAW_ANGLE (0x0C-0x0D), read as one block
+#define NUM_ENCODERS  5
+#define ENCODER_READ_MS (STATE_UPDATE_MS / NUM_ENCODERS)  // one encoder per slot, all fresh each STATE
+
 // Motor state
 struct Motor {
   int step_pin;
@@ -54,9 +62,47 @@ Motor motor_e1;
 Servo gripper;
 int gripper_position = 90;
 
+// Raw encoder angle 0-4095, -1 = no sensor, no magnet, or read error
+bool encoder_found[NUM_ENCODERS];
+int encoder_raw[NUM_ENCODERS];
+int next_encoder = 0;
+
 // Timing
 unsigned long last_state_time = 0;
 unsigned long last_command_time = 0;
+unsigned long last_encoder_time = 0;
+
+bool selectMuxChannel(uint8_t ch) {
+  Wire.beginTransmission(MUX_ADDR);
+  Wire.write(ch < 8 ? (1 << ch) : 0);
+  return Wire.endTransmission() == 0;
+}
+
+int readEncoder(uint8_t ch) {
+  if (!selectMuxChannel(ch)) return -1;
+  Wire.beginTransmission(AS5600_ADDR);
+  Wire.write(REG_STATUS);
+  if (Wire.endTransmission(false) != 0) return -1;
+  if (Wire.requestFrom((uint8_t)AS5600_ADDR, (uint8_t)3) != 3) return -1;
+  uint8_t status = Wire.read();
+  int raw = ((Wire.read() << 8) | Wire.read()) & 0x0FFF;
+  if (!(status & 0x20)) return -1;  // MD: no magnet detected
+  return raw;
+}
+
+void setupEncoders() {
+  Wire.begin();
+  Wire.setClock(400000);
+  Wire.setWireTimeout(3000, true);  // don't hang the step loop on a stuck bus
+  for (int i = 0; i < NUM_ENCODERS; i++) {
+    encoder_found[i] = false;
+    encoder_raw[i] = -1;
+    if (selectMuxChannel(i)) {
+      Wire.beginTransmission(AS5600_ADDR);
+      encoder_found[i] = (Wire.endTransmission() == 0);
+    }
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -129,6 +175,8 @@ void setup() {
   motor_e1.step_pin_high = false;
   motor_e1.position = 0;
   motor_e1.dir = 1;
+
+  setupEncoders();
 
   Serial.println("READY");
 }
@@ -247,9 +295,23 @@ void loop() {
   updateMotor(motor_e0);
   updateMotor(motor_e1);
 
+  // Read one encoder per slot so a single loop never blocks stepping for long
+  if (now - last_encoder_time >= ENCODER_READ_MS) {
+    if (encoder_found[next_encoder]) {
+      encoder_raw[next_encoder] = readEncoder(next_encoder);
+    }
+    next_encoder = (next_encoder + 1) % NUM_ENCODERS;
+    last_encoder_time = now;
+  }
+
   // Send state updates periodically
+  // STATE <x> <y> <z> <e0> <e1> <gripper> <enc0> <enc1> <enc2> <enc3> <enc4>
   if (now - last_state_time >= STATE_UPDATE_MS) {
-    Serial.println("STATE " + String(motor_x.position) + " " + String(motor_y.position) + " " + String(motor_z.position) + " " + String(motor_e0.position) + " " + String(motor_e1.position) + " " + String(gripper_position));
+    String state = "STATE " + String(motor_x.position) + " " + String(motor_y.position) + " " + String(motor_z.position) + " " + String(motor_e0.position) + " " + String(motor_e1.position) + " " + String(gripper_position);
+    for (int i = 0; i < NUM_ENCODERS; i++) {
+      state += " " + String(encoder_raw[i]);
+    }
+    Serial.println(state);
     last_state_time = now;
   }
 }
