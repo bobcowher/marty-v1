@@ -26,7 +26,7 @@ HOME_MAX_SPEED = 0.5     # ~8 deg/s on the shoulder
 
 # Soft limits. The encoder reaches us up to ~200ms late, so slow down well
 # before a limit and stop a little short of it.
-LIMIT_SLOW_DEG = 15.0    # cap speed toward a limit within this distance
+LIMIT_SLOW_DEG = 10.0    # cap speed toward a limit within this distance
 LIMIT_SLOW_SPEED = 0.15  # ~5 deg/s on the shoulder, ~1 deg of overshoot
 LIMIT_MARGIN_DEG = 1.0   # block motion toward a limit this far short of it
 

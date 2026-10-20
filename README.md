@@ -69,7 +69,10 @@ With MS1+MS2 jumpered (matching other slots), DRV8825 runs at 1/8 microstepping.
 - `firmware/firmware.ino` — Arduino: non-blocking velocity control via `micros()` timing, servo via `Servo.h`
 - `robot.py` — `Arm` class: serial interface, sends `MOVE` commands, tracks position
 - `controller.py` — 8BitDo joystick mapping with deadzone and scaling
-- `main.py` — 50Hz control loop
+- `main.py` — 50Hz control loop; Start/Back buttons for calibration and go-home
+- `robot_server.py` / `robot_env.py` — ZMQ backend and gym env for RL
+- `encoder_check.py` — moves the shoulder ~9° and back, compares encoder change to step count
+- `firmware/i2c_scan/` — bring-up sketch: scans the mux and prints raw AS5600 readings
 - `build.sh` — compile and upload via arduino-cli
 
 ## Controls (8BitDo Ultimate)
@@ -101,7 +104,7 @@ Servo step: `-1` (close), `0` (hold), `+1` (open).
 - `READY` — on boot
 - `MOVE OK x_period=N v5=N` — command acknowledged
 - `SERVO step=N pos=N` — servo moved
-- `STATE x y z e0 gripper\n` — position broadcast every 100ms
+- `STATE x y z e0 e1 gripper enc0 enc1 enc2 enc3 enc4\n` — broadcast every 100ms. Step counts, servo angle, then raw AS5600 angle per joint (0–4095; `-1` = no sensor, no magnet, or read error)
 - `ERROR ...` — parse failure
 
 ## Build & Monitor
@@ -125,4 +128,46 @@ SG90 servo is too weak for the current gripper design and the sliders stick unde
 `robot.py`'s `stop()` method sends `STOP 0 0\n` (2 args) but the firmware parser requires 5 args. Currently unused — motors stop via the 150ms firmware watchdog.
 
 ## Encoders
-Not yet wired. Planned for closed-loop control before RL integration.
+
+AS5600 magnetic encoders on each joint's output, behind a PCA9548A I2C mux (address 0x70) on the RAMPS I2C header (D20 SDA / D21 SCL / GND / 5V, right of Z-MAX). Mux channel = joint index: 0 base, 1 shoulder, 2 elbow, 3 wrist tilt, 4 wrist rotate. Only the shoulder (channel 1) is wired so far.
+
+The firmware reads one encoder every 20ms in rotation at 400kHz, so a read never blocks stepping for long and every encoder is fresh on each STATE line.
+
+**Mounting:** diametric magnet centred over the chip, on the chip side of the board. The shoulder bracket needed a 0.8mm card shim to clear the chip's "magnet too weak" flag; the reprinted mount plate should sit 1.2mm higher than the original. Run `./deploy.sh firmware/i2c_scan` to check AGC and status flags after any mounting change (`./deploy.sh firmware` to go back).
+
+**Shoulder, measured:** 50:1 at 800 pulses/rev is 40,000 steps per joint revolution vs 4,096 encoder counts, about 9.8 steps per count. `encoder_check.py` agreed with the step count to within 2%. A positive shoulder action moves the arm *back*.
+
+### Joint angles
+
+`Arm.joint_pos()` returns degrees from vertical per joint, forward positive, `NaN` for joints without a calibrated encoder. The env exposes it as `info['joint_pos']` from `reset()` and `step()`; the shoulder is index 1.
+
+Two per-joint signs in `robot.py` connect the pieces. `ANGLE_SIGN` makes forward positive and `ACTION_SIGN` says which way a positive action turns the angle. Both are −1 for the shoulder; set them for each new joint before calibrating it.
+
+### Calibration (Start button)
+
+Calibration is saved to `calibration.json` on the robot (not in git). Press Start, then for each prompt jog with the sticks and press Start again:
+
+1. Vertical: sets zero
+2. Home
+3. Forward limit
+4. Back limit: saves
+
+Prompts print to the journal (`journalctl --user-unit marty -f`). Back cancels. Every joint with an encoder reading at step 1 is calibrated together; other joints keep their saved values.
+
+Shoulder as of 2026-10-19: home −25.1°, forward limit +59.9°, back limit −63.8°.
+
+### Go home (Back button)
+
+Drives every joint with a saved home toward it using the encoder, at ~8°/s, slowing within 10° and stopping within 1°. Any stick input cancels. It stops if an encoder reading drops out.
+
+### Soft limits
+
+Enforced in `Arm.step()`, which both the joystick loop and `robot_server.py` go through, so an agent can't bypass them. They're off only while calibrating.
+
+- Within 10° of a limit, motion toward it is capped at ~5°/s
+- 1° short of a limit, motion toward it is blocked; motion away is always allowed
+- A joint with limits but no encoder reading can't move at all
+
+The margins cover encoder latency: the reading reaches Python up to ~200ms late. Measured stops on the shoulder land 0.4–0.6° inside the limit.
+
+These are software limits. If Python dies mid-move, the firmware's 150ms command watchdog is what stops the motors.
