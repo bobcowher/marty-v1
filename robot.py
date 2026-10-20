@@ -10,10 +10,14 @@ import numpy as np
 CALIBRATION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'calibration.json')
 ENCODER_COUNTS = 4096
 
-# +1 if a positive action raises that joint's raw encoder reading, so positive
-# action always means increasing joint angle. Only the shoulder (1) is verified
-# (encoder_check.py, 2026-10-19); set the others when their encoders go in.
-ENCODER_SIGN = [1, 1, 1, 1, 1]
+# Raw encoder counts -> degrees, chosen so forward of vertical is positive.
+# Shoulder: raw reading rises as the arm goes back, so -1 (calibration, 2026-10-19).
+ANGLE_SIGN = [1, -1, 1, 1, 1]
+
+# +1 if a positive action increases that joint's angle. Shoulder: positive action
+# raises the raw reading (encoder_check.py), i.e. moves the arm back, so -1.
+# Only the shoulder is verified; set the others when their encoders go in.
+ACTION_SIGN = [1, -1, 1, 1, 1]
 
 HOME_TOLERANCE_DEG = 1.0
 HOME_SLOW_DEG = 10.0     # start slowing down this far from home
@@ -26,7 +30,7 @@ class Arm():
         # Controls -
         # action [base, shoulder]
         # base - positive = right, negative = left
-        # shoulder - positive = forward, negative = back
+        # shoulder - positive = back, negative = forward (confirmed by encoder, 2026-10-19)
 
         if serial_interface is None:
             serial_interface = self.get_arduino_port()
@@ -133,7 +137,7 @@ class Arm():
     def raw_to_deg(self, joint, raw, zero_raw):
         """Degrees from zero, wrapped to [-180, 180)."""
         counts = (raw - zero_raw + ENCODER_COUNTS // 2) % ENCODER_COUNTS - ENCODER_COUNTS // 2
-        return ENCODER_SIGN[joint] * counts * 360.0 / ENCODER_COUNTS
+        return ANGLE_SIGN[joint] * counts * 360.0 / ENCODER_COUNTS
 
     def joint_pos(self):
         """Joint angles in degrees from vertical; NaN where a joint is uncalibrated or has no reading."""
@@ -161,7 +165,7 @@ class Arm():
             if abs(err) <= HOME_TOLERANCE_DEG:
                 continue
             speed = HOME_MIN_SPEED + (HOME_MAX_SPEED - HOME_MIN_SPEED) * min(abs(err) / HOME_SLOW_DEG, 1.0)
-            action[j] = np.sign(err) * speed
+            action[j] = ACTION_SIGN[j] * np.sign(err) * speed
 
         return None if np.all(action == 0) else action
 
