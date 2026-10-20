@@ -1,8 +1,24 @@
+import json
+import math
+import os
 import serial
 from serial.tools import list_ports
 import subprocess
 import time
 import numpy as np
+
+CALIBRATION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'calibration.json')
+ENCODER_COUNTS = 4096
+
+# +1 if a positive action raises that joint's raw encoder reading, so positive
+# action always means increasing joint angle. Only the shoulder (1) is verified
+# (encoder_check.py, 2026-10-19); set the others when their encoders go in.
+ENCODER_SIGN = [1, 1, 1, 1, 1]
+
+HOME_TOLERANCE_DEG = 1.0
+HOME_SLOW_DEG = 10.0     # start slowing down this far from home
+HOME_MIN_SPEED = 0.15    # normalized action, ~5 deg/s on the shoulder
+HOME_MAX_SPEED = 0.5     # ~8 deg/s on the shoulder
 
 class Arm():
 
@@ -33,6 +49,9 @@ class Arm():
 
         # Raw AS5600 angle per joint, 0-4095; -1 = no sensor, no magnet, or read error
         self.encoders = [-1, -1, -1, -1, -1]
+
+        # {joint: {'zero_raw', 'home', 'forward_limit', 'back_limit'}}, angles in degrees
+        self.calibration = self.load_calibration()
 
     def step(self, action):
         """
@@ -110,6 +129,53 @@ class Arm():
     def reset_position(self):
         """Reset position tracking to zero."""
         self.position = [0, 0, 0, 0, 0, 90]
+
+    def raw_to_deg(self, joint, raw, zero_raw):
+        """Degrees from zero, wrapped to [-180, 180)."""
+        counts = (raw - zero_raw + ENCODER_COUNTS // 2) % ENCODER_COUNTS - ENCODER_COUNTS // 2
+        return ENCODER_SIGN[joint] * counts * 360.0 / ENCODER_COUNTS
+
+    def joint_pos(self):
+        """Joint angles in degrees from vertical; NaN where a joint is uncalibrated or has no reading."""
+        self._read_state()
+        pos = [math.nan] * 5
+        for j, cal in self.calibration.items():
+            if self.encoders[j] >= 0:
+                pos[j] = self.raw_to_deg(j, self.encoders[j], cal['zero_raw'])
+        return pos
+
+    def home_action(self):
+        """Action that moves calibrated joints toward home, or None once all are within tolerance."""
+        homed = {j: cal for j, cal in self.calibration.items() if 'home' in cal}
+        if not homed:
+            print("No home saved - press Start to calibrate")
+            return None
+
+        pos = self.joint_pos()
+        action = np.zeros(6)
+        for j, cal in homed.items():
+            if math.isnan(pos[j]):
+                print(f"No encoder reading on joint {j} - homing stopped")
+                return None
+            err = cal['home'] - pos[j]
+            if abs(err) <= HOME_TOLERANCE_DEG:
+                continue
+            speed = HOME_MIN_SPEED + (HOME_MAX_SPEED - HOME_MIN_SPEED) * min(abs(err) / HOME_SLOW_DEG, 1.0)
+            action[j] = np.sign(err) * speed
+
+        return None if np.all(action == 0) else action
+
+    def load_calibration(self):
+        if not os.path.exists(CALIBRATION_FILE):
+            return {}
+        with open(CALIBRATION_FILE) as f:
+            return {int(j): cal for j, cal in json.load(f).items()}
+
+    def save_calibration(self, captured):
+        """Merge captured joints into the calibration file; other joints keep their values."""
+        self.calibration.update(captured)
+        with open(CALIBRATION_FILE, 'w') as f:
+            json.dump({str(j): cal for j, cal in sorted(self.calibration.items())}, f, indent=2)
 
     def get_arduino_port(self):
         """Returns first Arduino port or None"""

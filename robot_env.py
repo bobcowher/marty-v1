@@ -12,6 +12,8 @@ class RobotArmEnv(gym.Env):
 
     action_space:       Box(-1, 1, shape=(3,))  — [base, shoulder, elbow]
     observation_space:  Box(-inf, inf, shape=(2,)) — [x_steps, y_steps]
+    info['joint_pos']:  degrees from vertical per joint (index = joint, 1 = shoulder);
+                        NaN where a joint has no calibrated encoder
 
     Subclass and override compute_reward() and is_terminated() to implement
     task-specific logic. The server is a stateless hardware backend.
@@ -68,7 +70,7 @@ class RobotArmEnv(gym.Env):
         reward = self.compute_reward(obs, action)
         terminated = self.is_terminated(obs)
         truncated = False
-        return obs, reward, terminated, truncated, {}
+        return obs, reward, terminated, truncated, reply.get('info', {})
 
     def close(self):
         try:

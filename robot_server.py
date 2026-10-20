@@ -23,12 +23,12 @@ def main():
             if cmd == 'reset':
                 arm.reset_position()
                 obs = arm.get_position()
-                socket.send_json({'obs': obs, 'info': {}})
+                socket.send_json({'obs': obs, 'info': {'joint_pos': arm.joint_pos()}})
 
             elif cmd == 'step':
                 action = message.get('action')
                 obs = arm.step(action)
-                socket.send_json({'obs': obs})
+                socket.send_json({'obs': obs, 'info': {'joint_pos': arm.joint_pos()}})
 
             elif cmd == 'stop':
                 obs = arm.stop()
