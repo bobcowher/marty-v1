@@ -94,6 +94,8 @@ while True:
                     homing = True
                     print("HOME: going home")
 
+    robot.enforce_limits = calib_step is None
+
     action = controller.get_action()
 
     if action is not None:

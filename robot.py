@@ -24,6 +24,12 @@ HOME_SLOW_DEG = 10.0     # start slowing down this far from home
 HOME_MIN_SPEED = 0.15    # normalized action, ~5 deg/s on the shoulder
 HOME_MAX_SPEED = 0.5     # ~8 deg/s on the shoulder
 
+# Soft limits. The encoder reaches us up to ~200ms late, so slow down well
+# before a limit and stop a little short of it.
+LIMIT_SLOW_DEG = 15.0    # cap speed toward a limit within this distance
+LIMIT_SLOW_SPEED = 0.15  # ~5 deg/s on the shoulder, ~1 deg of overshoot
+LIMIT_MARGIN_DEG = 1.0   # block motion toward a limit this far short of it
+
 class Arm():
 
     def __init__(self, serial_interface=None) -> None:
@@ -57,6 +63,10 @@ class Arm():
         # {joint: {'zero_raw', 'home', 'forward_limit', 'back_limit'}}, angles in degrees
         self.calibration = self.load_calibration()
 
+        # Only calibration turns this off, so it can jog past the old limits
+        self.enforce_limits = True
+        self._limited = set()  # joints currently held by a limit, for logging changes
+
     def step(self, action):
         """
         Send velocity command. Motors continue at this velocity until next command.
@@ -72,6 +82,10 @@ class Arm():
 
         MIN_DELAY = 200
         MAX_DELAY = 1800
+
+        action = np.array(action, dtype=float)
+        if self.enforce_limits:
+            action = self._apply_limits(action)
 
         motor_action = action[:5]
         servo_step = int(action[5])
@@ -168,6 +182,31 @@ class Arm():
             action[j] = ACTION_SIGN[j] * np.sign(err) * speed
 
         return None if np.all(action == 0) else action
+
+    def _apply_limits(self, action):
+        """Slow, then block, motion toward a joint's calibrated limits; block it entirely with no reading."""
+        pos = self.joint_pos()
+        limited = set()
+        for j, cal in self.calibration.items():
+            if 'forward_limit' not in cal or action[j] == 0:
+                continue
+            if math.isnan(pos[j]):
+                action[j] = 0  # no reading: don't move a joint we can't see
+                limited.add(j)
+                continue
+            # Which way the angle will move, and how far until the limit that way
+            moving = ACTION_SIGN[j] * np.sign(action[j])
+            room = cal['forward_limit'] - pos[j] if moving > 0 else pos[j] - cal['back_limit']
+            if room <= LIMIT_MARGIN_DEG:
+                action[j] = 0
+                limited.add(j)
+            elif room <= LIMIT_SLOW_DEG:
+                action[j] = np.sign(action[j]) * min(abs(action[j]), LIMIT_SLOW_SPEED)
+
+        if limited != self._limited:
+            print(f"LIMIT: holding joints {sorted(limited)} pos={pos}")
+            self._limited = limited
+        return action
 
     def load_calibration(self):
         if not os.path.exists(CALIBRATION_FILE):
