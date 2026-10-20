@@ -23,7 +23,12 @@ while True:
     loop_start = time.time()
 
     # Process pygame events (required for joystick to update)
-    pygame.event.pump()
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:  # SDL turns SIGTERM/SIGINT into QUIT
+            robot.stop()
+            raise SystemExit
+        if event.type == pygame.JOYBUTTONDOWN:
+            print(f"button {event.button} pressed")
 
     action = controller.get_action()
 
