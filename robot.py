@@ -31,6 +31,9 @@ class Arm():
         # Position tracking (from step counts + servo angle)
         self.position = [0, 0, 0, 0, 0, 90]
 
+        # Raw AS5600 angle per joint, 0-4095; -1 = no sensor, no magnet, or read error
+        self.encoders = [-1, -1, -1, -1, -1]
+
     def step(self, action):
         """
         Send velocity command. Motors continue at this velocity until next command.
@@ -89,6 +92,8 @@ class Arm():
                     parts = response.split()
                     if len(parts) >= 7:
                         self.position = [int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4]), int(parts[5]), int(parts[6])]
+                    if len(parts) >= 12:
+                        self.encoders = [int(p) for p in parts[7:12]]
             except:
                 pass  # Ignore decode errors
 
