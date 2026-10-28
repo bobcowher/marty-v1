@@ -129,6 +129,32 @@ SG90 servo is too weak for the current gripper design and the sliders stick unde
 ### `stop()` Command Format
 `robot.py`'s `stop()` method sends `STOP 0 0\n` (2 args) but the firmware parser requires 5 args. Currently unused — motors stop via the 150ms firmware watchdog.
 
+## Calibrating Marty (quick start)
+
+You'll need marty powered up with the gamepad connected, and this desktop (the one with speakers) on the same network.
+
+1. **Check the robot is listening.** Run `ssh marty 'systemctl --user is-active marty'`. It should say `active`. If it doesn't, run `./deploy.sh`.
+2. **Start the voice on the desktop.** Run this and leave it running:
+   ```bash
+   conda activate marty-v1
+   python voice_link.py          # prints "Listening to tcp://marty.local:5556"
+   ```
+3. **Press Start.** Marty says "Calibration started", then "Shoulder joint, vertical".
+4. **For each prompt, jog the joint there with the sticks, then press Start.** Each joint gets four positions:
+   - **vertical**: straight up. Every angle is measured from here.
+   - **home**: where Back sends it. Keep it a few degrees *inside* the limits, not on one. Homing stops 1° short of a limit, so a home sitting on a limit may never be reached.
+   - **min limit**: as far back as it can safely go.
+   - **max limit**: as far forward as it can safely go.
+
+   Marty does the shoulder, then the elbow, then any other joint that has a working encoder.
+5. **"Calibration saved"** means you're done. Press Back to check it goes home.
+
+Things to know:
+- **Soft limits are off while calibrating.** That's so you can reach the old limits and beyond. Watch the arm.
+- **Back cancels**, and nothing is saved. Every joint with an encoder gets redone each time; there's no way to do just one yet.
+- **Silence?** Check that `voice_link.py` is still running. Then watch `ssh marty 'journalctl --user-unit marty -f'`. Every prompt is logged there as `SAY: …`, so you can follow along by reading even without the voice. If nothing at all happens on Start, the journal will say there are no encoder readings.
+- **Checking the result:** `ssh marty cat marty-v1/calibration.json`. If something is slightly off, you can edit that file directly; angles are in degrees.
+
 ## Encoders
 
 AS5600 magnetic encoders on each joint's output, behind a PCA9548A I2C mux (address 0x70) on the RAMPS I2C header (D20 SDA / D21 SCL / GND / 5V, right of Z-MAX). Mux channel = joint index: 0 base, 1 shoulder, 2 elbow, 3 wrist tilt, 4 wrist rotate. Shoulder (channel 1) and elbow (channel 2) are wired so far.
@@ -158,7 +184,7 @@ Calibration is saved to `calibration.json` on the robot (not in git). Press Star
 
 Prompts are printed to the journal (`journalctl --user-unit marty -f`) and spoken through the voice client (below). The sequence lives in `calibration.py`.
 
-Shoulder as of 2026-10-19: home −25.1°, max limit +59.9°, min limit −63.8°. Files that still use the old `forward_limit`/`back_limit` keys are renamed on load.
+As of 2026-10-27: shoulder home −21.4°, limits −52.5° / +96.8°; elbow home +149.8°, limits −62.9° / +149.8° (home on the limit, see step 4 above). Files that still use the old `forward_limit`/`back_limit` keys are renamed on load.
 
 ### Voice
 
