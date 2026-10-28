@@ -3,3 +3,4 @@ CLAUDE.md
 *.log
 
 calibration.json
+voice_samples/

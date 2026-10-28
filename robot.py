@@ -12,12 +12,14 @@ ENCODER_COUNTS = 4096
 
 # Raw encoder counts -> degrees, chosen so forward of vertical is positive.
 # Shoulder: raw reading rises as the arm goes back, so -1 (calibration, 2026-10-19).
-ANGLE_SIGN = [1, -1, 1, 1, 1]
+# Elbow: same, -1 (encoder_check.py 2, 2026-10-27).
+ANGLE_SIGN = [1, -1, -1, 1, 1]
 
 # +1 if a positive action increases that joint's angle. Shoulder: positive action
 # raises the raw reading (encoder_check.py), i.e. moves the arm back, so -1.
-# Only the shoulder is verified; set the others when their encoders go in.
-ACTION_SIGN = [1, -1, 1, 1, 1]
+# Elbow: positive action moves the forearm up/back, so -1 (2026-10-27).
+# Only the shoulder and elbow are verified; set the others when their encoders go in.
+ACTION_SIGN = [1, -1, -1, 1, 1]
 
 HOME_TOLERANCE_DEG = 1.0
 HOME_SLOW_DEG = 10.0     # start slowing down this far from home
@@ -60,7 +62,7 @@ class Arm():
         # Raw AS5600 angle per joint, 0-4095; -1 = no sensor, no magnet, or read error
         self.encoders = [-1, -1, -1, -1, -1]
 
-        # {joint: {'zero_raw', 'home', 'forward_limit', 'back_limit'}}, angles in degrees
+        # {joint: {'zero_raw', 'home', 'min_limit', 'max_limit'}}, angles in degrees
         self.calibration = self.load_calibration()
 
         # Only calibration turns this off, so it can jog past the old limits
@@ -188,7 +190,7 @@ class Arm():
         pos = self.joint_pos()
         limited = set()
         for j, cal in self.calibration.items():
-            if 'forward_limit' not in cal or action[j] == 0:
+            if 'max_limit' not in cal or action[j] == 0:
                 continue
             if math.isnan(pos[j]):
                 action[j] = 0  # no reading: don't move a joint we can't see
@@ -196,7 +198,7 @@ class Arm():
                 continue
             # Which way the angle will move, and how far until the limit that way
             moving = ACTION_SIGN[j] * np.sign(action[j])
-            room = cal['forward_limit'] - pos[j] if moving > 0 else pos[j] - cal['back_limit']
+            room = cal['max_limit'] - pos[j] if moving > 0 else pos[j] - cal['min_limit']
             if room <= LIMIT_MARGIN_DEG:
                 action[j] = 0
                 limited.add(j)
@@ -212,7 +214,13 @@ class Arm():
         if not os.path.exists(CALIBRATION_FILE):
             return {}
         with open(CALIBRATION_FILE) as f:
-            return {int(j): cal for j, cal in json.load(f).items()}
+            calibration = {int(j): cal for j, cal in json.load(f).items()}
+        # Files from before 2026-10-27 named the limits by direction; forward was the positive end
+        for cal in calibration.values():
+            for old, new in (('forward_limit', 'max_limit'), ('back_limit', 'min_limit')):
+                if old in cal:
+                    cal[new] = cal.pop(old)
+        return calibration
 
     def save_calibration(self, captured):
         """Merge captured joints into the calibration file; other joints keep their values."""

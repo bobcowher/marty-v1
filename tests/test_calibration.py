@@ -55,7 +55,7 @@ def test_save_calibration_merges(tmp_path, monkeypatch):
 
 
 # Shoulder from the real calibration: forward is a negative action, back is positive
-LIMITS = {1: {'zero_raw': 919, 'home': -25.1, 'forward_limit': 59.9, 'back_limit': -63.8}}
+LIMITS = {1: {'zero_raw': 919, 'home': -25.1, 'min_limit': -63.8, 'max_limit': 59.9}}
 FORWARD, BACK = -1.0, 1.0
 
 
@@ -95,3 +95,10 @@ def test_limits_block_joint_without_reading():
     arm = make_arm([-1, -1, -1, -1, -1], LIMITS)
     assert shoulder_action(arm, FORWARD) == 0
     assert shoulder_action(arm, BACK) == 0
+
+
+def test_load_calibration_renames_direction_keys(tmp_path, monkeypatch):
+    path = tmp_path / 'cal.json'
+    path.write_text('{"1": {"zero_raw": 919, "home": -25.1, "forward_limit": 59.9, "back_limit": -63.8}}')
+    monkeypatch.setattr(robot, 'CALIBRATION_FILE', str(path))
+    assert make_arm([-1] * 5, {}).load_calibration() == LIMITS

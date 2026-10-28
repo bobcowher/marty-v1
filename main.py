@@ -1,7 +1,9 @@
 import numpy as np
 
 import controller
+from calibration import Calibration
 from robot import Arm
+from voice_link import VoicePublisher
 
 from controller import Controller
 import pygame
@@ -20,55 +22,12 @@ COMMAND_RATE_HZ = 50  # Send commands at 50Hz max
 command_interval = 1.0 / COMMAND_RATE_HZ
 
 # Logitech Dual Action, confirmed 2026-10-19
-START_BUTTON = 9  # calibrate: zero, home, forward limit, back limit
+START_BUTTON = 9  # calibrate: per joint, vertical, home, min limit, max limit
 BACK_BUTTON = 8   # go home; cancels calibration in progress
 
-CALIBRATION_STEPS = [
-    ('zero',          "CALIBRATE: jog to vertical, then press Start"),
-    ('home',          "CALIBRATE: jog to home, then press Start"),
-    ('forward_limit', "CALIBRATE: jog to the forward limit, then press Start"),
-    ('back_limit',    "CALIBRATE: jog to the back limit, then press Start"),
-]
-
-
-def calibration_press(step, captured):
-    """Advance the calibration sequence on a Start press. Returns the new (step, captured)."""
-    if step is None:
-        print(CALIBRATION_STEPS[0][1])
-        return 0, {}
-
-    name = CALIBRATION_STEPS[step][0]
-    robot.get_position()
-    if name == 'zero':
-        captured = {j: {'zero_raw': raw} for j, raw in enumerate(robot.encoders) if raw >= 0}
-        if not captured:
-            print("CALIBRATE: no encoder readings - cancelled")
-            return None, {}
-    else:
-        for j, cal in captured.items():
-            raw = robot.encoders[j]
-            if raw < 0:
-                print(f"CALIBRATE: lost encoder on joint {j} - cancelled")
-                return None, {}
-            cal[name] = round(robot.raw_to_deg(j, raw, cal['zero_raw']), 1)
-    print(f"CALIBRATE: captured {name}: {captured}")
-
-    step += 1
-    if step < len(CALIBRATION_STEPS):
-        print(CALIBRATION_STEPS[step][1])
-        return step, captured
-
-    for j, cal in captured.items():
-        if not cal['back_limit'] < cal['home'] < cal['forward_limit']:
-            print(f"CALIBRATE: WARNING joint {j} home is not between its limits")
-    robot.save_calibration(captured)
-    print("CALIBRATE: saved")
-    return None, {}
-
+calibration = Calibration(robot, say=VoicePublisher().say)
 
 homing = False
-calib_step = None  # index into CALIBRATION_STEPS while calibrating
-calib = {}
 
 while True:
     loop_start = time.time()
@@ -85,16 +44,15 @@ while True:
             print(f"button {event.button} pressed")
             if event.button == START_BUTTON:
                 homing = False
-                calib_step, calib = calibration_press(calib_step, calib)
+                calibration.press()
             elif event.button == BACK_BUTTON:
-                if calib_step is not None:
-                    calib_step, calib = None, {}
-                    print("CALIBRATE: cancelled")
+                if calibration.active:
+                    calibration.cancel()
                 else:
                     homing = True
                     print("HOME: going home")
 
-    robot.enforce_limits = calib_step is None
+    robot.enforce_limits = not calibration.active
 
     action = controller.get_action()
 

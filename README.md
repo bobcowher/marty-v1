@@ -71,6 +71,8 @@ With MS1+MS2 jumpered (matching other slots), DRV8825 runs at 1/8 microstepping.
 - `controller.py` — 8BitDo joystick mapping with deadzone and scaling
 - `main.py` — 50Hz control loop; Start/Back buttons for calibration and go-home
 - `robot_server.py` / `robot_env.py` — ZMQ backend and gym env for RL
+- `calibration.py` — per-joint calibration sequence and its spoken prompts
+- `voice/`, `voice_link.py` — robot voice, and the ZMQ bridge that speaks it on another machine
 - `encoder_check.py` — moves the shoulder ~9° and back, compares encoder change to step count
 - `firmware/i2c_scan/` — bring-up sketch: scans the mux and prints raw AS5600 readings
 - `build.sh` — compile and upload via arduino-cli
@@ -129,7 +131,7 @@ SG90 servo is too weak for the current gripper design and the sliders stick unde
 
 ## Encoders
 
-AS5600 magnetic encoders on each joint's output, behind a PCA9548A I2C mux (address 0x70) on the RAMPS I2C header (D20 SDA / D21 SCL / GND / 5V, right of Z-MAX). Mux channel = joint index: 0 base, 1 shoulder, 2 elbow, 3 wrist tilt, 4 wrist rotate. Only the shoulder (channel 1) is wired so far.
+AS5600 magnetic encoders on each joint's output, behind a PCA9548A I2C mux (address 0x70) on the RAMPS I2C header (D20 SDA / D21 SCL / GND / 5V, right of Z-MAX). Mux channel = joint index: 0 base, 1 shoulder, 2 elbow, 3 wrist tilt, 4 wrist rotate. Shoulder (channel 1) and elbow (channel 2) are wired so far.
 
 The firmware reads one encoder every 20ms in rotation at 400kHz, so a read never blocks stepping for long and every encoder is fresh on each STATE line.
 
@@ -141,20 +143,37 @@ The firmware reads one encoder every 20ms in rotation at 400kHz, so a read never
 
 `Arm.joint_pos()` returns degrees from vertical per joint, forward positive, `NaN` for joints without a calibrated encoder. The env exposes it as `info['joint_pos']` from `reset()` and `step()`; the shoulder is index 1.
 
-Two per-joint signs in `robot.py` connect the pieces. `ANGLE_SIGN` makes forward positive and `ACTION_SIGN` says which way a positive action turns the angle. Both are −1 for the shoulder; set them for each new joint before calibrating it.
+Two per-joint signs in `robot.py` connect the pieces. `ANGLE_SIGN` makes forward positive and `ACTION_SIGN` says which way a positive action turns the angle. Both are −1 for the shoulder and the elbow; set them for each new joint before calibrating it.
 
 ### Calibration (Start button)
 
-Calibration is saved to `calibration.json` on the robot (not in git). Press Start, then for each prompt jog with the sticks and press Start again:
+Calibration is saved to `calibration.json` on the robot (not in git). Press Start ("Calibration started"), then each joint that has an encoder reading is walked through in turn. For each prompt, jog with the sticks and press Start again:
 
-1. Vertical: sets zero
-2. Home
-3. Forward limit
-4. Back limit: saves
+1. "Shoulder joint, vertical": sets zero
+2. "Shoulder joint, home"
+3. "Shoulder joint, min limit": the back end (negative angles)
+4. "Shoulder joint, max limit": the forward end (positive angles)
 
-Prompts print to the journal (`journalctl --user-unit marty -f`). Back cancels. Every joint with an encoder reading at step 1 is calibrated together; other joints keep their saved values.
+…then the same for the elbow, and so on. After the last joint: "Calibration saved". Back cancels ("Calibration cancelled") and nothing is saved; joints not walked through keep their saved values.
 
-Shoulder as of 2026-10-19: home −25.1°, forward limit +59.9°, back limit −63.8°.
+Prompts are printed to the journal (`journalctl --user-unit marty -f`) and spoken through the voice client (below). The sequence lives in `calibration.py`.
+
+Shoulder as of 2026-10-19: home −25.1°, max limit +59.9°, min limit −63.8°. Files that still use the old `forward_limit`/`back_limit` keys are renamed on load.
+
+### Voice
+
+`voice/` speaks text in a small-robot voice: Piper TTS, then a filter in `voice/effects.py` (pitch up, warble, ring-mod buzz, bit-crush grit, small-speaker band-pass). Phrases are cached as WAVs in `~/.cache/marty-voice` and played with `aplay`. It knows nothing about the arm, so it can move onto the robot once it has a speaker.
+
+Until then, `main.py` publishes each prompt over ZMQ (PUB, port 5556) and a client on another machine speaks it:
+
+```bash
+pip install piper-tts pyzmq
+python -m piper.download_voices en_US-lessac-medium --data-dir ~/.local/share/piper-voices
+python voice_link.py              # connects to marty.local:5556
+python voice_samples.py           # render every prompt to voice_samples/ to judge the voice
+```
+
+Publishing never blocks; prompts are dropped if no client is listening. `voice_link.py` goes away once the robot has its own speaker.
 
 ### Go home (Back button)
 
