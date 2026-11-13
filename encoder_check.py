@@ -3,7 +3,8 @@
 Stop the marty service first (it holds the serial port):
     systemctl --user stop marty && python encoder_check.py [joint]; systemctl --user start marty
 
-joint: 1 shoulder (default), 2 elbow
+joint: 1 shoulder (default), 2 elbow, 3 wrist tilt, 4 wrist rotate
+seconds: how long each move runs (default 1.5)
 """
 import sys
 import time
@@ -14,10 +15,12 @@ JOINT = int(sys.argv[1]) if len(sys.argv) > 1 else 1
 STEPS_PER_JOINT_REV = {
     1: 800 * 50,             # shoulder: DM542TE at 800 pulses/rev, 50:1 gearbox
     2: 44000,                # elbow: measured 2026-10-27 (~13.7:1 at 1/16; nominal 5.18 x 3 would be 49,700)
+    3: 3200 * 19,            # wrist tilt: nominal, 1/16 step and 19:1 gearbox
+    4: None,                 # wrist rotate: unknown
 }[JOINT]
 ENCODER_COUNTS = 4096
 SPEED = 0.3       # normalized stick value, ~700 steps/s
-MOVE_SECONDS = 1.5
+MOVE_SECONDS = float(sys.argv[2]) if len(sys.argv) > 2 else 1.5
 
 
 def settle(arm, seconds=0.5):
@@ -54,7 +57,7 @@ for label, speed in [("forward", SPEED), ("back", -SPEED)]:
     steps1, enc1 = settle(arm)
     d_steps = steps1 - steps0
     d_enc = encoder_delta(enc0, enc1)
-    expected = d_steps * ENCODER_COUNTS / STEPS_PER_JOINT_REV
+    expected = d_steps * ENCODER_COUNTS / STEPS_PER_JOINT_REV if STEPS_PER_JOINT_REV else float('nan')
     print(f"{label:8s} steps {d_steps:+6d}  enc {d_enc:+5d}  expected ±{abs(expected):6.1f}  "
           f"joint {d_enc * 360 / ENCODER_COUNTS:+6.1f} deg  "
           f"measured {abs(d_steps * ENCODER_COUNTS / d_enc) if d_enc else float('nan'):.0f} steps/rev")
