@@ -72,9 +72,9 @@ class Controller:
                 print("Sticks centered - controls live")
             return None
 
-        # L1 (button 5) = up, R1 (button 6) = down — wrist tilt
-        l1 = self.joystick.get_button(5)
-        r1 = self.joystick.get_button(6)
+        # L1 (button 4) / R1 (button 5) on the Logitech Dual Action — wrist tilt (E0)
+        l1 = self.joystick.get_button(4)
+        r1 = self.joystick.get_button(5)
         action[3] = l1 - r1  # +1 (up), -1 (down), 0 (neither)
 
         # L2 (button 7) / R2 (button 8) — wrist rotation
