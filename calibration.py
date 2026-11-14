@@ -67,7 +67,7 @@ class Calibration:
 
         self.step += 1
         if self.step == len(STEPS):
-            if not cal['min_limit'] < cal['home'] < cal['max_limit']:
+            if not min(cal['min_limit'], cal['max_limit']) < cal['home'] < max(cal['min_limit'], cal['max_limit']):
                 print(f"CALIBRATE: WARNING joint {j} home is not between its limits")
             self.step = 0
             self.joint += 1

@@ -32,6 +32,13 @@ LIMIT_SLOW_DEG = 10.0    # cap speed toward a limit within this distance
 LIMIT_SLOW_SPEED = 0.15  # ~5 deg/s on the shoulder, ~1 deg of overshoot
 LIMIT_MARGIN_DEG = 1.0   # block motion toward a limit this far short of it
 
+
+def _order_limits(cal):
+    """min_limit is the smaller angle, whichever end was captured first."""
+    if 'min_limit' in cal and 'max_limit' in cal and cal['min_limit'] > cal['max_limit']:
+        cal['min_limit'], cal['max_limit'] = cal['max_limit'], cal['min_limit']
+
+
 class Arm():
 
     def __init__(self, serial_interface=None) -> None:
@@ -220,10 +227,13 @@ class Arm():
             for old, new in (('forward_limit', 'max_limit'), ('back_limit', 'min_limit')):
                 if old in cal:
                     cal[new] = cal.pop(old)
+            _order_limits(cal)
         return calibration
 
     def save_calibration(self, captured):
         """Merge captured joints into the calibration file; other joints keep their values."""
+        for cal in captured.values():
+            _order_limits(cal)
         self.calibration.update(captured)
         with open(CALIBRATION_FILE, 'w') as f:
             json.dump({str(j): cal for j, cal in sorted(self.calibration.items())}, f, indent=2)
