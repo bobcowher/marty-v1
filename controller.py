@@ -75,7 +75,7 @@ class Controller:
         # L1 (button 4) / R1 (button 5) on the Logitech Dual Action — wrist tilt (E0)
         l1 = self.joystick.get_button(4)
         r1 = self.joystick.get_button(5)
-        action[3] = r1 - l1  # direction confirmed by press 2026-11-12
+        action[3] = l1 - r1  # flipped back 2026-11-13 after the wrist motor swap
 
         # L2 (button 7) / R2 (button 8) — wrist rotation
         # l2 = self.joystick.get_button(7)
