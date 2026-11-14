@@ -7,6 +7,10 @@ Only joints with an encoder reading when calibration starts are walked through.
 
 JOINT_NAMES = ['Base', 'Shoulder', 'Elbow', 'Wrist tilt', 'Wrist rotate']
 
+# Left out of calibration even when their encoder reads. Wrist rotate (the
+# spinner) moves ~8x faster than the homing/limit speeds were tuned for.
+SKIP_JOINTS = {4}
+
 # (calibration key, spoken name). zero_raw is the raw count at vertical; the
 # rest are degrees from vertical. min is the back end, max the forward end.
 STEPS = [
@@ -79,7 +83,7 @@ class Calibration:
         self.say(CANCELLED)
 
     def _start(self):
-        joints = [j for j, raw in enumerate(self.arm.encoders) if raw >= 0]
+        joints = [j for j, raw in enumerate(self.arm.encoders) if raw >= 0 and j not in SKIP_JOINTS]
         if not joints:
             print("CALIBRATE: no encoder readings, nothing to calibrate")
             return
